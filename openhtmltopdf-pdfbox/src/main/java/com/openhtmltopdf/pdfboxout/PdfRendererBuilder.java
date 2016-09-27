@@ -1,7 +1,9 @@
 package com.openhtmltopdf.pdfboxout;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Map;
 
 import org.w3c.dom.Document;
 
@@ -17,11 +19,15 @@ import com.openhtmltopdf.pdfboxout.PdfBoxRenderer.BaseDocument;
 import com.openhtmltopdf.pdfboxout.PdfBoxRenderer.PageDimensions;
 import com.openhtmltopdf.pdfboxout.PdfBoxRenderer.UnicodeImplementation;
 
-public class PdfRendererBuilder
-{
-    public static enum TextDirection { RTL, LTR; }
-    public static enum PageSizeUnits { MM, INCHES };
-    
+public class PdfRendererBuilder {
+
+
+    public static enum TextDirection {RTL, LTR;}
+
+    public static enum PageSizeUnits {MM, INCHES}
+
+    ;
+
     public static final float PAGE_SIZE_LETTER_WIDTH = 8.5f;
     public static final float PAGE_SIZE_LETTER_HEIGHT = 11.0f;
     public static final PageSizeUnits PAGE_SIZE_LETTER_UNITS = PageSizeUnits.INCHES;
@@ -35,6 +41,7 @@ public class PdfRendererBuilder
     private Document _document;
     private String _baseUri;
     private String _uri;
+    private Map<String, String> _fontMap;
     private File _file;
     private OutputStream _os;
     private FSUriResolver _resolver;
@@ -51,9 +58,9 @@ public class PdfRendererBuilder
     private FSTextTransformer _unicodeToLowerTransformer;
     private FSTextTransformer _unicodeToTitleTransformer;
 
-    
     /**
      * Run the XHTML/XML to PDF conversion and output to an output stream set by toStream.
+     *
      * @throws Exception
      */
     public void run() throws Exception {
@@ -67,25 +74,27 @@ public class PdfRendererBuilder
                 renderer.cleanup();
         }
     }
-    
+
     /**
      * Build a PdfBoxRenderer for further customization.
      * Remember to call {@link PdfBoxRenderer#cleanup()} after use.
+     *
      * @return
      */
-    public PdfBoxRenderer buildPdfRenderer() {
-        UnicodeImplementation unicode = new UnicodeImplementation(_reorderer, _splitter, _lineBreaker, 
+    public PdfBoxRenderer buildPdfRenderer() throws IOException {
+        UnicodeImplementation unicode = new UnicodeImplementation(_reorderer, _splitter, _lineBreaker,
                 _unicodeToLowerTransformer, _unicodeToUpperTransformer, _unicodeToTitleTransformer, _textDirection, _charBreaker);
 
         PageDimensions pageSize = new PageDimensions(_pageWidth, _pageHeight, _isPageSizeInches);
-        
+
         BaseDocument doc = new BaseDocument(_baseUri, _html, _document, _file, _uri);
-        
-        return new PdfBoxRenderer(doc, unicode, _httpStreamFactory, _os, _resolver, _cache, _svgImpl, pageSize, _pdfVersion, _replacementText, _testMode);
+
+        return new PdfBoxRenderer(doc, unicode, _httpStreamFactory, _os, _resolver, _cache, _svgImpl, pageSize, _pdfVersion, _replacementText,_fontMap, _testMode);
     }
-    
+
     /**
      * The default text direction of the document. LTR by default.
+     *
      * @param textDirection
      * @return
      */
@@ -96,6 +105,7 @@ public class PdfRendererBuilder
 
     /**
      * Whether to use test mode and output the PDF uncompressed. Turned off by default.
+     *
      * @param mode
      * @return
      */
@@ -103,10 +113,11 @@ public class PdfRendererBuilder
         this._testMode = mode;
         return this;
     }
-    
+
     /**
      * Provides an HttpStreamFactory implementation if the user desires to use an external
      * HTTP/HTTPS implementation. Uses URL::openStream by default.
+     *
      * @param factory
      * @return
      */
@@ -114,9 +125,10 @@ public class PdfRendererBuilder
         this._httpStreamFactory = factory;
         return this;
     }
-    
+
     /**
      * Provides a uri resolver to resolve relative uris or private uri schemes.
+     *
      * @param resolver
      * @return
      */
@@ -124,10 +136,11 @@ public class PdfRendererBuilder
         this._resolver = resolver;
         return this;
     }
-    
+
     /**
      * Provides an external cache which can choose to cache items between runs,
      * such as fonts or logo images.
+     *
      * @param cache
      * @return
      */
@@ -135,9 +148,10 @@ public class PdfRendererBuilder
         this._cache = cache;
         return this;
     }
-    
+
     /**
      * Provides a text splitter to split text into directional runs. Does nothing by default.
+     *
      * @param splitter
      * @return
      */
@@ -145,9 +159,10 @@ public class PdfRendererBuilder
         this._splitter = splitter;
         return this;
     }
-    
+
     /**
      * Provides a reorderer to properly reverse RTL text. No-op by default.
+     *
      * @param reorderer
      * @return
      */
@@ -155,9 +170,10 @@ public class PdfRendererBuilder
         this._reorderer = reorderer;
         return this;
     }
-    
+
     /**
      * Provides a string containing XHTML/XML to convert to PDF.
+     *
      * @param html
      * @param baseUri
      * @return
@@ -170,6 +186,7 @@ public class PdfRendererBuilder
 
     /**
      * Provides a w3c DOM Document acquired from an external source.
+     *
      * @param doc
      * @param baseUri
      * @return
@@ -182,6 +199,7 @@ public class PdfRendererBuilder
 
     /**
      * Provides a URI to convert to PDF. The URI MUST point to a strict XHTML/XML document.
+     *
      * @param uri
      * @return
      */
@@ -189,9 +207,15 @@ public class PdfRendererBuilder
         this._uri = uri;
         return this;
     }
-    
+
+    public PdfRendererBuilder fontMap(Map<String, String> map) {
+        this._fontMap = map;
+        return this;
+    }
+
     /**
      * Provides a file to convert to PDF. The file MUST contain XHTML/XML in UTF-8 encoding.
+     *
      * @param file
      * @return
      */
@@ -203,6 +227,7 @@ public class PdfRendererBuilder
     /**
      * An output stream to output the resulting PDF. The caller is required to close the output stream after calling
      * run.
+     *
      * @param out
      * @return
      */
@@ -210,9 +235,10 @@ public class PdfRendererBuilder
         this._os = out;
         return this;
     }
-    
+
     /**
      * Uses the specified SVG drawer implementation.
+     *
      * @param svgImpl
      * @return
      */
@@ -223,11 +249,12 @@ public class PdfRendererBuilder
 
     /**
      * Specifies the default page size to use if none is specified in CSS.
+     *
      * @param pageWidth
      * @param pageHeight
-     * @param units either mm or inches.
-     * @see {@link #PAGE_SIZE_LETTER_WIDTH}, {@link #PAGE_SIZE_LETTER_HEIGHT} and {@link #PAGE_SIZE_LETTER_UNITS}
+     * @param units      either mm or inches.
      * @return
+     * @see {@link #PAGE_SIZE_LETTER_WIDTH}, {@link #PAGE_SIZE_LETTER_HEIGHT} and {@link #PAGE_SIZE_LETTER_UNITS}
      */
     public PdfRendererBuilder useDefaultPageSize(float pageWidth, float pageHeight, PageSizeUnits units) {
         this._pageWidth = pageWidth;
@@ -235,11 +262,12 @@ public class PdfRendererBuilder
         this._isPageSizeInches = (units == PageSizeUnits.INCHES);
         return this;
     }
-    
+
     /**
      * Set the PDF version, typically we use 1.7.
      * If you set a lower version, it is your responsibility to make sure
      * no more recent PDF features are used.
+     *
      * @param version
      * @return
      */
@@ -247,12 +275,13 @@ public class PdfRendererBuilder
         this._pdfVersion = version;
         return this;
     }
-    
+
     /**
      * The replacement text to use if a character is cannot be renderered by any of the specified fonts.
      * This is not broken across lines so should be one or zero characters for best results.
      * Also, make sure it can be rendered by at least one of your specified fonts!
      * The default is the # character.
+     *
      * @param replacement
      * @return
      */
@@ -260,14 +289,15 @@ public class PdfRendererBuilder
         this._replacementText = replacement;
         return this;
     }
-    
+
     /**
      * Specify the line breaker. By default a Java default BreakIterator line instance is used
      * with US locale. Additionally, this is wrapped with UrlAwareLineBreakIterator to also
      * break before the forward slash (/) character so that long URIs can be broken on to multiple lines.
-     * 
+     * <p>
      * You may want to use a BreakIterator with a different locale (wrapped by UrlAwareLineBreakIterator or not)
      * or a more advanced BreakIterator from icu4j (see the rtl-support module for an example).
+     *
      * @param breaker
      * @return
      */
@@ -275,11 +305,12 @@ public class PdfRendererBuilder
         this._lineBreaker = breaker;
         return this;
     }
-    
+
     /**
-     * Specify the character breaker. By default a break iterator character instance is used with 
+     * Specify the character breaker. By default a break iterator character instance is used with
      * US locale. Currently this is used when <code>word-wrap: break-word</code> is in
      * effect.
+     *
      * @param breaker
      * @return
      */
@@ -287,10 +318,11 @@ public class PdfRendererBuilder
         this._charBreaker = breaker;
         return this;
     }
-    
+
     /**
      * Specify a transformer to use to upper case strings.
      * By default <code>String::toUpperCase(Locale.US)</code> is used.
+     *
      * @param tr
      * @return
      */
@@ -302,6 +334,7 @@ public class PdfRendererBuilder
     /**
      * Specify a transformer to use to lower case strings.
      * By default <code>String::toLowerCase(Locale.US)</code> is used.
+     *
      * @param tr
      * @return
      */
@@ -313,6 +346,7 @@ public class PdfRendererBuilder
     /**
      * Specify a transformer to title case strings.
      * By default a best effort implementation (non locale aware) is used.
+     *
      * @param tr
      * @return
      */
