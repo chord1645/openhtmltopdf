@@ -19,30 +19,27 @@
  */
 package com.openhtmltopdf.pdfboxout;
 
-import java.awt.Dimension;
-import java.awt.Rectangle;
-import java.awt.Shape;
-import java.awt.geom.Rectangle2D;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.StringReader;
-import java.io.StringWriter;
-import java.io.Writer;
-import java.util.Calendar;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Pattern;
-
-import javax.xml.transform.OutputKeys;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerConfigurationException;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
-
+import com.openhtmltopdf.bidi.BidiReorderer;
+import com.openhtmltopdf.bidi.BidiSplitter;
+import com.openhtmltopdf.bidi.BidiSplitterFactory;
+import com.openhtmltopdf.bidi.SimpleBidiReorderer;
+import com.openhtmltopdf.context.StyleReference;
+import com.openhtmltopdf.css.parser.FSRGBColor;
+import com.openhtmltopdf.css.style.CalculatedStyle;
+import com.openhtmltopdf.extend.*;
+import com.openhtmltopdf.layout.BoxBuilder;
+import com.openhtmltopdf.layout.Layer;
+import com.openhtmltopdf.layout.LayoutContext;
+import com.openhtmltopdf.layout.SharedContext;
+import com.openhtmltopdf.pdfboxout.event.PageEventListener;
+import com.openhtmltopdf.render.BlockBox;
+import com.openhtmltopdf.render.PageBox;
+import com.openhtmltopdf.render.RenderingContext;
+import com.openhtmltopdf.render.ViewportBox;
+import com.openhtmltopdf.resource.XMLResource;
+import com.openhtmltopdf.simple.extend.XhtmlNamespaceHandler;
+import com.openhtmltopdf.util.Configuration;
+import com.openhtmltopdf.util.XRLog;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDDocumentInformation;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -55,32 +52,16 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.xml.sax.InputSource;
 
-import com.openhtmltopdf.bidi.BidiReorderer;
-import com.openhtmltopdf.bidi.BidiSplitter;
-import com.openhtmltopdf.bidi.BidiSplitterFactory;
-import com.openhtmltopdf.bidi.SimpleBidiReorderer;
-import com.openhtmltopdf.context.StyleReference;
-import com.openhtmltopdf.css.style.CalculatedStyle;
-import com.openhtmltopdf.extend.FSCache;
-import com.openhtmltopdf.extend.FSTextBreaker;
-import com.openhtmltopdf.extend.FSTextTransformer;
-import com.openhtmltopdf.extend.FSUriResolver;
-import com.openhtmltopdf.extend.HttpStreamFactory;
-import com.openhtmltopdf.extend.NamespaceHandler;
-import com.openhtmltopdf.extend.SVGDrawer;
-import com.openhtmltopdf.extend.UserInterface;
-import com.openhtmltopdf.layout.BoxBuilder;
-import com.openhtmltopdf.layout.Layer;
-import com.openhtmltopdf.layout.LayoutContext;
-import com.openhtmltopdf.layout.SharedContext;
-import com.openhtmltopdf.render.BlockBox;
-import com.openhtmltopdf.render.PageBox;
-import com.openhtmltopdf.render.RenderingContext;
-import com.openhtmltopdf.render.ViewportBox;
-import com.openhtmltopdf.resource.XMLResource;
-import com.openhtmltopdf.simple.extend.XhtmlNamespaceHandler;
-import com.openhtmltopdf.util.Configuration;
-import com.openhtmltopdf.util.XRLog;
+import javax.xml.transform.*;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+import java.awt.*;
+import java.awt.geom.Rectangle2D;
+import java.io.*;
+import java.util.Calendar;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
 
 public class PdfBoxRenderer {
     // These two defaults combine to produce an effective resolution of 96 px to
@@ -91,7 +72,7 @@ public class PdfBoxRenderer {
 
     private final SharedContext _sharedContext;
     private final PdfBoxOutputDevice _outputDevice;
-
+    private List<PageEventListener> _eventListeners;
     private Document _doc;
     private BlockBox _root;
 
@@ -236,12 +217,13 @@ public class PdfBoxRenderer {
                    OutputStream os, FSUriResolver resolver, FSCache cache, SVGDrawer svgImpl,
                    PageDimensions pageSize, float pdfVersion, String replacementText,
                    Map<String, String> fontMap,
+                   List<PageEventListener> eventListeners,
                    boolean testMode) throws IOException {
         this(doc, unicode, httpStreamFactory, os, resolver, cache, svgImpl, pageSize, pdfVersion, replacementText, testMode);
         PdfBoxFontResolver fontResolver = (PdfBoxFontResolver) _sharedContext.getFontResolver();
-        for (Map.Entry<String, String> e : fontMap.entrySet()) {
+        for (Map.Entry<String, String> e : fontMap.entrySet())
             fontResolver.addFont(e.getKey(), e.getValue());
-        }
+        this._eventListeners = eventListeners;
     }
 
     /**
@@ -656,7 +638,6 @@ public class PdfBoxRenderer {
         PDPage page = new PDPage(new PDRectangle((float) firstPageSize.getWidth(), (float) firstPageSize.getHeight()));
         PDPageContentStream cs = new PDPageContentStream(doc, page, AppendMode.APPEND, !_testMode);
         doc.addPage(page);
-
         _outputDevice.initializePage(cs, page, (float) firstPageSize.getHeight());
         _root.getLayer().assignPagePaintingPositions(c, Layer.PAGED_MODE_PRINT);
 
@@ -670,6 +651,8 @@ public class PdfBoxRenderer {
 
             c.setPage(i, currentPage);
             paintPage(c, currentPage);
+            //TODO 适合添加页面事件
+            beforeFinish(c, currentPage);
             _outputDevice.finishPage();
 
             if (i != pageCount - 1) {
@@ -684,6 +667,12 @@ public class PdfBoxRenderer {
         }
 
         _outputDevice.finish(c, _root);
+    }
+
+    private void beforeFinish(RenderingContext c, PageBox currentPage) {
+        for (PageEventListener listener : _eventListeners) {
+            listener.beforeFinish(c, currentPage);
+        }
     }
 
     // Sets the document information dictionary values from html metadata

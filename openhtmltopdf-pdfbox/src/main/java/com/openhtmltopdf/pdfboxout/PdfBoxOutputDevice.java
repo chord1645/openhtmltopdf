@@ -346,7 +346,7 @@ public class PdfBoxOutputDevice extends AbstractOutputDevice implements OutputDe
         followPath(s, STROKE);
     }
 
-    protected void drawLine(int x1, int y1, int x2, int y2) {
+    public void drawLine(int x1, int y1, int x2, int y2) {
         Line2D line = new Line2D.Double(x1, y1, x2, y2);
         draw(line);
     }

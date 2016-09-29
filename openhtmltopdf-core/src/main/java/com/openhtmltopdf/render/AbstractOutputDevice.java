@@ -85,7 +85,7 @@ public abstract class AbstractOutputDevice implements OutputDevice {
                             text,
                             iB.getAbsX() + inlineText.getX(), iB.getAbsY() + iB.getBaseline());
                 }
-            } else {
+            } else {//写字
                 c.getTextRenderer().drawString(
                         c.getOutputDevice(),
                         text,

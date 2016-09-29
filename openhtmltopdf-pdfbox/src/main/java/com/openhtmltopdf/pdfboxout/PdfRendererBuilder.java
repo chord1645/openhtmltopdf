@@ -3,8 +3,11 @@ package com.openhtmltopdf.pdfboxout;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
+import com.openhtmltopdf.pdfboxout.event.PageEventListener;
 import org.w3c.dom.Document;
 
 import com.openhtmltopdf.bidi.BidiReorderer;
@@ -42,6 +45,7 @@ public class PdfRendererBuilder {
     private String _baseUri;
     private String _uri;
     private Map<String, String> _fontMap;
+    private List<PageEventListener> _eventListeners = new ArrayList<PageEventListener>();
     private File _file;
     private OutputStream _os;
     private FSUriResolver _resolver;
@@ -89,7 +93,7 @@ public class PdfRendererBuilder {
 
         BaseDocument doc = new BaseDocument(_baseUri, _html, _document, _file, _uri);
 
-        return new PdfBoxRenderer(doc, unicode, _httpStreamFactory, _os, _resolver, _cache, _svgImpl, pageSize, _pdfVersion, _replacementText,_fontMap, _testMode);
+        return new PdfBoxRenderer(doc, unicode, _httpStreamFactory, _os, _resolver, _cache, _svgImpl, pageSize, _pdfVersion, _replacementText, _fontMap, _eventListeners, _testMode);
     }
 
     /**
@@ -210,6 +214,13 @@ public class PdfRendererBuilder {
 
     public PdfRendererBuilder fontMap(Map<String, String> map) {
         this._fontMap = map;
+        return this;
+    }
+
+    public PdfRendererBuilder listener(PageEventListener... pageEventListener) {
+        for (PageEventListener eventListener : pageEventListener) {
+            this._eventListeners.add(eventListener);
+        }
         return this;
     }
 
